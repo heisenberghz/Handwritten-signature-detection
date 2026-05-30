@@ -124,3 +124,5 @@ if __name__ == "__main__":
     batch = BatchPreprocessor()
     results = batch.process_all(save_visualizations=True)
     batch.verify_output(num_samples=3)
+    
+    
