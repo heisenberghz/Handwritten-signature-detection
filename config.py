@@ -21,22 +21,17 @@ for directory in [PROCESSED_DIR, SPLIT_DIR, CHECKPOINT_DIR, LOG_DIR, FIGURES_DIR
     directory.mkdir(parents=True, exist_ok=True)
 
 # ── CEDAR Dataset Specific ──────────────────────────────────
-# Folder names
 CEDAR_GENUINE_DIR = "full_org"
 CEDAR_FORGED_DIR = "full_forg"
 
-# Filename patterns
-# genuine: original_X_Y.png  where X=person_id (1-55), Y=sample (1-24)
-# forged:  forgeries_X_Y.png where X=person_id (1-55), Y=sample (1-24)
 GENUINE_PREFIX = "original"
 FORGED_PREFIX = "forgeries"
 
-# Dataset stats
 NUM_PERSONS = 55
 SAMPLES_PER_PERSON = 24
 
 # ── Image Processing Parameters ─────────────────────────────
-IMAGE_SIZE = (256, 256)          # Target size for all images
+IMAGE_SIZE = (256, 256)
 GRAYSCALE = True
 NORMALIZE = True
 
@@ -50,5 +45,12 @@ VAL_RATIO = 0.15
 TEST_RATIO = 0.15
 RANDOM_SEED = 42
 
+# ── Split Source ────────────────────────────────────────────
+# Split is created FROM preprocessed images, not raw
+SPLIT_SOURCE_DIR = PROCESSED_DIR  # data/processed/
+
 print(f"✓ Config loaded. Project root: {BASE_DIR}")
-print(f"✓ Raw data expected at: {RAW_DATA_DIR}")
+print(f"✓ Raw data: {RAW_DATA_DIR}")
+print(f"✓ Preprocessed data: {PROCESSED_DIR}")
+print(f"✓ Split output: {SPLIT_DIR}")
+print(f"✓ Split source: {SPLIT_SOURCE_DIR}")

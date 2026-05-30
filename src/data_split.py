@@ -1,5 +1,5 @@
 """
-src/data_split.py - Writer-independent train/val/test split for CEDAR dataset
+src/data_split.py - Writer-independent train/val/test split from PREPROCESSED images
 """
 
 import sys
@@ -12,48 +12,82 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import (
     SPLIT_DIR,
-    RAW_DATA_DIR,
-    CEDAR_GENUINE_DIR,
-    CEDAR_FORGED_DIR,
+    PROCESSED_DIR,
     TRAIN_RATIO,
     VAL_RATIO,
     TEST_RATIO,
     RANDOM_SEED
 )
-from src.dataset_loader import CEDARDatasetLoader
 
 
 class WriterIndependentSplit:
     """
-    Splits CEDAR dataset by person (writer-independent).
+    Splits PREPROCESSED CEDAR dataset by person (writer-independent).
     
     Training, validation, and test sets contain DIFFERENT people.
-    This ensures the model learns to detect forgeries, not memorize writers.
+    Source: data/processed/genuine/ and data/processed/forged/
+    Output: data/split/train/, val/, test/
     """
 
     def __init__(
         self,
+        source_dir: Path = PROCESSED_DIR,
         output_dir: Path = SPLIT_DIR,
         train_ratio: float = TRAIN_RATIO,
         val_ratio: float = VAL_RATIO,
         test_ratio: float = TEST_RATIO,
         seed: int = RANDOM_SEED
     ):
+        self.source_dir = source_dir
         self.output_dir = output_dir
         self.train_ratio = train_ratio
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
         self.seed = seed
         
-        self.loader = CEDARDatasetLoader()
-        
-        # Will hold person IDs for each split
         self.train_persons: List[int] = []
         self.val_persons: List[int] = []
         self.test_persons: List[int] = []
         
-        # Statistics
         self.stats: Dict[str, dict] = {}
+
+    def _extract_person_id(self, filename: str) -> int:
+        """Extract person ID from preprocessed filename (original_X_Y.png or forgeries_X_Y.png)."""
+        # Remove _viz suffix if present
+        stem = Path(filename).stem.replace("_viz", "")
+        # Parse: original_1_1 or forgeries_1_1
+        parts = stem.split("_")
+        if len(parts) >= 2:
+            try:
+                return int(parts[1])
+            except ValueError:
+                pass
+        return -1
+
+    def _get_all_samples(self) -> List[Tuple[Path, int, int, str]]:
+        """
+        Scan processed/ directory and collect all samples.
+        Returns list of (file_path, person_id, label, label_name).
+        """
+        samples = []
+        
+        for label_name, label in [("genuine", 1), ("forged", 0)]:
+            class_dir = self.source_dir / label_name
+            if not class_dir.exists():
+                raise FileNotFoundError(f"Processed directory not found: {class_dir}")
+            
+            # Only get non-viz files (the float32 versions)
+            for f in sorted(class_dir.glob("*.png")):
+                if f.name.endswith("_viz.png"):
+                    continue
+                
+                person_id = self._extract_person_id(f.name)
+                if person_id > 0:
+                    samples.append((f, person_id, label, label_name))
+                else:
+                    print(f"   ⚠️  Could not parse person ID from: {f.name}")
+        
+        return samples
 
     def _split_persons(self, all_persons: List[int]) -> Tuple[List[int], List[int], List[int]]:
         """Split person IDs into train/val/test sets."""
@@ -63,7 +97,6 @@ class WriterIndependentSplit:
         n = len(shuffled)
         n_train = int(n * self.train_ratio)
         n_val = int(n * self.val_ratio)
-        # Test gets remainder to avoid rounding issues
         
         train = shuffled[:n_train]
         val = shuffled[n_train:n_train + n_val]
@@ -71,7 +104,7 @@ class WriterIndependentSplit:
         
         return train, val, test
 
-    def _copy_samples(self, samples, split_name: str) -> Tuple[int, int]:
+    def _copy_samples(self, samples: List[Tuple], split_name: str) -> Tuple[int, int]:
         """
         Copy samples to split directory.
         Returns (genuine_count, forged_count).
@@ -82,16 +115,14 @@ class WriterIndependentSplit:
         genuine_count = 0
         forged_count = 0
         
-        for sample in samples:
-            # Create subdirectory: split/genuine/ or split/forged/
-            class_dir = split_dir / sample.label_name
+        for file_path, person_id, label, label_name in samples:
+            class_dir = split_dir / label_name
             class_dir.mkdir(parents=True, exist_ok=True)
             
-            # Copy file
-            dest = class_dir / sample.file_path.name
-            shutil.copy2(str(sample.file_path), str(dest))
+            dest = class_dir / file_path.name
+            shutil.copy2(str(file_path), str(dest))
             
-            if sample.label == 1:
+            if label == 1:
                 genuine_count += 1
             else:
                 forged_count += 1
@@ -99,20 +130,25 @@ class WriterIndependentSplit:
         return genuine_count, forged_count
 
     def create_split(self) -> Dict[str, dict]:
-        """
-        Execute the full writer-independent split.
-        Returns statistics dictionary.
-        """
+        """Execute the full writer-independent split from processed images."""
         print("=" * 55)
-        print("📂 Writer-Independent Train/Val/Test Split")
+        print("📂 Writer-Independent Split (from PREPROCESSED images)")
         print("=" * 55)
         
-        # Load dataset
-        self.loader.discover()
+        # Collect all preprocessed samples
+        print(f"\n🔍 Scanning preprocessed data at: {self.source_dir}")
+        all_samples = self._get_all_samples()
         
-        # Get unique person IDs
-        all_persons = sorted(self.loader.persons)
-        print(f"\nTotal persons found: {len(all_persons)}")
+        # Group by person
+        person_to_samples: Dict[int, List[Tuple]] = {}
+        for sample in all_samples:
+            _, person_id, _, _ = sample
+            if person_id not in person_to_samples:
+                person_to_samples[person_id] = []
+            person_to_samples[person_id].append(sample)
+        
+        all_persons = sorted(person_to_samples.keys())
+        print(f"Found {len(all_persons)} persons with {len(all_samples)} total samples")
         
         # Split persons
         self.train_persons, self.val_persons, self.test_persons = self._split_persons(all_persons)
@@ -129,9 +165,9 @@ class WriterIndependentSplit:
         print("\n✓ No person overlap between splits")
         
         # Filter samples by split
-        train_samples = [s for s in self.loader.samples if s.person_id in self.train_persons]
-        val_samples = [s for s in self.loader.samples if s.person_id in self.val_persons]
-        test_samples = [s for s in self.loader.samples if s.person_id in self.test_persons]
+        train_samples = [s for s in all_samples if s[1] in self.train_persons]
+        val_samples = [s for s in all_samples if s[1] in self.val_persons]
+        test_samples = [s for s in all_samples if s[1] in self.test_persons]
         
         # Copy files
         print(f"\n📥 Copying samples to {self.output_dir}...")
