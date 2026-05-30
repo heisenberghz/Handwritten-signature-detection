@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# VS Code
+.vscode/
+
+# Processed dataset outputs
+data/processed/
+data/split/
+
+# Experiment outputs
+experiments/checkpoints/
+experiments/logs/
+experiments/figures/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dataset (optional - recommended)
+data/raw/
