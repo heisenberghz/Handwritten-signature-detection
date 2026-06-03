@@ -21,6 +21,7 @@ spec.loader.exec_module(config)
 
 IMAGE_SIZE = config.IMAGE_SIZE
 CHECKPOINT_DIR = config.CHECKPOINT_DIR
+MODEL_FILENAME = config.MODEL_FILENAME
 
 # Load model
 model_path = project_root / "src" / "model.py"
@@ -35,24 +36,23 @@ class SignaturePredictor:
     
     def __init__(self, model_path: Path = None, device: str = None):
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
-        print(f"💻 Using device: {self.device}")
-        
-        # Load model architecture
+        print(f"[INFO] Using device: {self.device}")
+
         self.model = SignatureCNN(num_classes=2, dropout=0.5).to(self.device)
-        
-        # Load trained weights
+
         if model_path is None:
-            model_path = CHECKPOINT_DIR / "cnn_best_v2.pth"
-        
+            model_path = CHECKPOINT_DIR / MODEL_FILENAME
+
         if not model_path.exists():
             raise FileNotFoundError(f"Model not found: {model_path}")
-        
+
         checkpoint = torch.load(model_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.eval()
-        
-        print(f"✅ Loaded model from epoch {checkpoint.get('epoch', '?')}")
-        print(f"   Validation accuracy: {checkpoint.get('val_accuracy', '?'):.4f}")
+
+        epoch = checkpoint.get("epoch", "?")
+        val_acc = checkpoint.get("val_accuracy", "?")
+        print(f"[INFO] Loaded model from epoch {epoch} (val_acc={val_acc})")
     
     def preprocess_image(self, image_path: Path) -> torch.Tensor:
         """

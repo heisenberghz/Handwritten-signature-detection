@@ -61,7 +61,8 @@ class WriterIndependentSplit:
             try:
                 return int(parts[1])
             except ValueError:
-                pass
+                print(f"   ⚠️  Could not parse person ID from filename: {filename}")
+                return -1
         return -1
 
     def _get_all_samples(self) -> List[Tuple[Path, int, int, str]]:

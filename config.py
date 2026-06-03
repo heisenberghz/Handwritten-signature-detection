@@ -49,8 +49,22 @@ RANDOM_SEED = 42
 # Split is created FROM preprocessed images, not raw
 SPLIT_SOURCE_DIR = PROCESSED_DIR  # data/processed/
 
-print(f"✓ Config loaded. Project root: {BASE_DIR}")
-print(f"✓ Raw data: {RAW_DATA_DIR}")
-print(f"✓ Preprocessed data: {PROCESSED_DIR}")
-print(f"✓ Split output: {SPLIT_DIR}")
-print(f"✓ Split source: {SPLIT_SOURCE_DIR}")
+# ── Model ────────────────────────────────────────────────────
+MODEL_FILENAME = "cnn_best_v2.pth"
+
+# ── Training Hyperparameters ─────────────────────────────────
+BATCH_SIZE = 32
+LEARNING_RATE = 0.0001
+WEIGHT_DECAY = 1e-4
+NUM_EPOCHS = 50
+PATIENCE = 5
+
+# ── Verification ─────────────────────────────────────────────
+SIMILARITY_THRESHOLD = 0.7
+
+if __name__ == "__main__":
+    print(f"Config loaded. Project root: {BASE_DIR}")
+    print(f"Raw data: {RAW_DATA_DIR}")
+    print(f"Preprocessed data: {PROCESSED_DIR}")
+    print(f"Split output: {SPLIT_DIR}")
+    print(f"Split source: {SPLIT_SOURCE_DIR}")

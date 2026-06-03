@@ -4,9 +4,10 @@ src/train_cnn.py - CNN training with data augmentation and better regularization
 
 import sys
 import time
+import json
 import importlib.util
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import torch
 import torch.nn as nn
@@ -30,6 +31,11 @@ CHECKPOINT_DIR = config.CHECKPOINT_DIR
 LOG_DIR = config.LOG_DIR
 IMAGE_SIZE = config.IMAGE_SIZE
 RANDOM_SEED = config.RANDOM_SEED
+BATCH_SIZE = config.BATCH_SIZE
+LEARNING_RATE = config.LEARNING_RATE
+WEIGHT_DECAY = config.WEIGHT_DECAY
+NUM_EPOCHS = config.NUM_EPOCHS
+PATIENCE = config.PATIENCE
 
 # Load model
 model_path = project_root / "src" / "model.py"
@@ -56,7 +62,7 @@ def set_seed(seed: int = RANDOM_SEED):
     torch.manual_seed(seed)
     np.random.seed(seed)
     if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 
 class AugmentedSignatureDataset(torch.utils.data.Dataset):
@@ -186,19 +192,18 @@ def train():
     print(f"   ⏱️  Dataset loading time: {_format_time(load_time)}")
     
     # ── DataLoaders ───────────────────────────────────────
-    batch_size = 32
     num_workers = 0
     
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True,
+        train_dataset, batch_size=BATCH_SIZE, shuffle=True,
         num_workers=num_workers, pin_memory=True if device.type == "cuda" else False
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False,
+        val_dataset, batch_size=BATCH_SIZE, shuffle=False,
         num_workers=num_workers
     )
     test_loader = DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False,
+        test_dataset, batch_size=BATCH_SIZE, shuffle=False,
         num_workers=num_workers
     )
     
@@ -213,30 +218,30 @@ def train():
     
     # ── Loss & Optimizer ──────────────────────────────────
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-4)  # Lower LR, higher decay
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', factor=0.5, patience=3  # Faster LR reduction
     )
     
     # ── Training Loop ─────────────────────────────────────
-    num_epochs = 50
     best_val_acc = 0.0
-    patience = 5  # Stop earlier
     patience_counter = 0
+    history: List[Dict] = []
     
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     best_model_path = CHECKPOINT_DIR / "cnn_best_v2.pth"
     
-    print(f"\n🚀 Training for up to {num_epochs} epochs...")
+    print(f"\n🚀 Training for up to {NUM_EPOCHS} epochs...")
     print("-" * 70)
     
     train_start = time.time()
     
-    for epoch in range(1, num_epochs + 1):
+    for epoch in range(1, NUM_EPOCHS + 1):
         epoch_start = time.time()
         
-        train_metrics = train_epoch(model, train_loader, criterion, optimizer, device, epoch, num_epochs)
-        val_metrics = validate(model, val_loader, criterion, device, epoch, num_epochs)
+        train_metrics = train_epoch(model, train_loader, criterion, optimizer, device, epoch, NUM_EPOCHS)
+        val_metrics = validate(model, val_loader, criterion, device, epoch, NUM_EPOCHS)
         
         scheduler.step(val_metrics["loss"])
         
@@ -246,6 +251,16 @@ def train():
         print(f"      Train Loss: {train_metrics['loss']:.4f} | Train Acc: {train_metrics['accuracy']:.4f}")
         print(f"      Val Loss:   {val_metrics['loss']:.4f} | Val Acc:   {val_metrics['accuracy']:.4f}")
         print(f"      ⏱️  Epoch time: {_format_time(epoch_time)}")
+        
+        history.append({
+            "epoch": epoch,
+            "train_loss": round(train_metrics["loss"], 6),
+            "train_accuracy": round(train_metrics["accuracy"], 6),
+            "val_loss": round(val_metrics["loss"], 6),
+            "val_accuracy": round(val_metrics["accuracy"], 6),
+            "epoch_time_seconds": round(epoch_time, 2),
+            "learning_rate": round(optimizer.param_groups[0]["lr"], 8),
+        })
         
         if val_metrics["accuracy"] > best_val_acc:
             best_val_acc = val_metrics["accuracy"]
@@ -260,14 +275,33 @@ def train():
             patience_counter = 0
         else:
             patience_counter += 1
-            print(f"      Patience: {patience_counter}/{patience}")
+            print(f"      Patience: {patience_counter}/{PATIENCE}")
         
-        if patience_counter >= patience:
+        if patience_counter >= PATIENCE:
             print(f"\n⏹️  Early stopping triggered after {epoch} epochs")
             break
     
     train_time = time.time() - train_start
     print(f"\n⏱️  Total training time: {_format_time(train_time)}")
+    
+    log_file = LOG_DIR / "training_history.json"
+    with open(log_file, "w") as f:
+        json.dump({
+            "model": "SignatureCNN v2",
+            "hyperparameters": {
+                "batch_size": BATCH_SIZE,
+                "learning_rate": LEARNING_RATE,
+                "weight_decay": WEIGHT_DECAY,
+                "num_epochs": NUM_EPOCHS,
+                "patience": PATIENCE,
+                "dropout": 0.5,
+                "image_size": list(IMAGE_SIZE),
+            },
+            "best_val_accuracy": best_val_acc,
+            "total_training_time_seconds": round(train_time, 2),
+            "history": history,
+        }, f, indent=2)
+    print(f"   📝 Training log saved: {log_file}")
     
     # ── Test Evaluation ───────────────────────────────────
     print("\n" + "=" * 70)

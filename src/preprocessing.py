@@ -151,23 +151,19 @@ class SignaturePreprocessor:
         Save preprocessed image to disk.
         
         Args:
-            image: Preprocessed image array
+            image: Preprocessed image array (float32, range [0, 1])
             output_path: Where to save
-            as_uint8: If True, convert back to 0-255 for visualization
+            as_uint8: If True, convert to 8-bit for visualization
         """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         if as_uint8:
             save_img = (image * 255).astype(np.uint8)
-        else:
-            save_img = image
-        
-        if save_img.dtype == np.float32 or save_img.dtype == np.float64:
-            save_img_16bit = (save_img * 65535).astype(np.uint16)
-            cv2.imwrite(str(output_path), save_img_16bit)
-        else:
             cv2.imwrite(str(output_path), save_img)
+        else:
+            save_img_16bit = (image * 65535).astype(np.uint16)
+            cv2.imwrite(str(output_path), save_img_16bit)
 
     def get_pipeline_steps(self) -> list:
         """Return list of preprocessing steps for documentation."""

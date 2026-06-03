@@ -88,6 +88,7 @@ def show_comparison(person_id: int = None, num_pairs: int = 3):
     print(f"✅ Visualization saved to: {save_path}")
     
     plt.show()
+    plt.close(fig)
 
 
 if __name__ == "__main__":

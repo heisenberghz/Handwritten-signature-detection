@@ -71,15 +71,17 @@ class CEDARDatasetLoader:
         
         # Match pattern: prefix_person_sample
         # e.g., original_1_1 or forgeries_12_24
-        pattern = rf"^{re.escape(label_name == 'genuine' and GENUINE_PREFIX or FORGED_PREFIX)}_(\d+)_(\d+)$"
+        prefix = GENUINE_PREFIX if label_name == 'genuine' else FORGED_PREFIX
+        pattern = rf"^{re.escape(prefix)}_(\d+)_(\d+)$"
         match = re.match(pattern, stem)
         
         if match:
             person_id = int(match.group(1))
             sample_num = int(match.group(2))
             
+            sub_dir = CEDAR_GENUINE_DIR if label_name == 'genuine' else CEDAR_FORGED_DIR
             return SignatureSample(
-                file_path=self.data_dir / (label_name == 'genuine' and CEDAR_GENUINE_DIR or CEDAR_FORGED_DIR) / filename,
+                file_path=self.data_dir / sub_dir / filename,
                 person_id=person_id,
                 sample_num=sample_num,
                 label=label,
