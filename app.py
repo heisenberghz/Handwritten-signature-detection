@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 
 from src.predict import SignaturePredictor
 from src.verify_signature import SignatureVerifier
-from config import IMAGE_SIZE, CHECKPOINT_DIR, MODEL_FILENAME, SIMILARITY_THRESHOLD
+from config import IMAGE_SIZE, CHECKPOINT_DIR
 
 st.set_page_config(
     page_title="Signature Forensics AI",
@@ -523,6 +523,7 @@ def preprocess_signature(image_path: Path):
 
 @st.cache_resource
 def get_predictor():
+    from config import MODEL_FILENAME
     model_file = CHECKPOINT_DIR / MODEL_FILENAME
     if not model_file.exists():
         st.error(f"Model not found at: {model_file}")
@@ -531,6 +532,7 @@ def get_predictor():
 
 @st.cache_resource
 def get_verifier():
+    from config import MODEL_FILENAME
     model_file = CHECKPOINT_DIR / MODEL_FILENAME
     if not model_file.exists():
         st.error(f"Model not found at: {model_file}")
@@ -562,7 +564,10 @@ def circular_progress_svg(percentage: float, color: str = "#10b981", size: int =
     </svg>
     """
 
-def make_gauge(score: float, threshold: float = SIMILARITY_THRESHOLD):
+def make_gauge(score: float, threshold: float = None):
+    if threshold is None:
+        from config import SIMILARITY_THRESHOLD
+        threshold = SIMILARITY_THRESHOLD
     color = "#ef4444"
     if score >= threshold:
         color = "#10b981"
