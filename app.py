@@ -523,8 +523,7 @@ def preprocess_signature(image_path: Path):
 
 @st.cache_resource
 def get_predictor():
-    from config import MODEL_FILENAME
-    model_file = CHECKPOINT_DIR / MODEL_FILENAME
+    model_file = CHECKPOINT_DIR / "cnn_best_v2.pth"
     if not model_file.exists():
         st.error(f"Model not found at: {model_file}")
         st.stop()
@@ -532,8 +531,7 @@ def get_predictor():
 
 @st.cache_resource
 def get_verifier():
-    from config import MODEL_FILENAME
-    model_file = CHECKPOINT_DIR / MODEL_FILENAME
+    model_file = CHECKPOINT_DIR / "cnn_best_v2.pth"
     if not model_file.exists():
         st.error(f"Model not found at: {model_file}")
         st.stop()
@@ -564,10 +562,7 @@ def circular_progress_svg(percentage: float, color: str = "#10b981", size: int =
     </svg>
     """
 
-def make_gauge(score: float, threshold: float = None):
-    if threshold is None:
-        from config import SIMILARITY_THRESHOLD
-        threshold = SIMILARITY_THRESHOLD
+def make_gauge(score: float, threshold: float = 0.7):
     color = "#ef4444"
     if score >= threshold:
         color = "#10b981"
